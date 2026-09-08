@@ -161,3 +161,17 @@ it('selects the deepest cwd match without comparator-time path normalization', (
     normalize.mockRestore()
   }
 })
+
+it('normalizes only the cwd, each root, and the matching path when roots do not nest', () => {
+  const worktrees = Array.from({ length: 300 }, (_, i) =>
+    worktree({ id: String(i), path: `/repo/w${i}` })
+  )
+  const normalize = vi.spyOn(String.prototype, 'normalize')
+  try {
+    expect(resolveChecksPanelWorktreeFromTerminalCwd('/repo/w150/src/a', worktrees)?.id).toBe('150')
+    // 1 cwd + 300 candidate roots + 1 matched path; main normalized 600.
+    expect(normalize.mock.calls.length).toBe(302)
+  } finally {
+    normalize.mockRestore()
+  }
+})

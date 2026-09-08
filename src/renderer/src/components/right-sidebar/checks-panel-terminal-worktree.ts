@@ -18,8 +18,9 @@ type WorktreeCandidate = {
   worktree: Worktree
   path: string
   source: 'current-path' | 'prior-path'
-  normalizedPathLength: number
 }
+
+type MatchedWorktreeCandidate = WorktreeCandidate & { normalizedPathLength: number }
 
 /** Resolve the active terminal PTY that should provide Checks panel cwd context. */
 export function resolveChecksPanelTerminalPtyId(context: TerminalPtyContext): string | null {
@@ -56,13 +57,18 @@ export function resolveChecksPanelWorktreeFromTerminalCwd(
   }
 
   const normalizedCwd = normalizeRuntimePathForComparison(terminalCwd)
-  let best: WorktreeCandidate | undefined
+  let best: MatchedWorktreeCandidate | undefined
   for (const candidate of buildWorktreeCandidates(worktrees)) {
     if (!isTerminalCwdInsideWorktree(candidate.path, normalizedCwd)) {
       continue
     }
-    if (!best || compareWorktreeCandidates(candidate, best) < 0) {
-      best = candidate
+    // Why after the filter: most candidates never match, so normalizing every path is wasted work.
+    const matched = {
+      ...candidate,
+      normalizedPathLength: normalizeRuntimePathForComparison(candidate.path).length
+    }
+    if (!best || compareWorktreeCandidates(matched, best) < 0) {
+      best = matched
     }
   }
   return best?.worktree ?? null
@@ -72,12 +78,7 @@ function buildWorktreeCandidates(worktrees: readonly Worktree[]): WorktreeCandid
   const candidates: WorktreeCandidate[] = []
   for (const worktree of worktrees) {
     if (hasUsablePath(worktree.path)) {
-      candidates.push({
-        worktree,
-        path: worktree.path,
-        source: 'current-path',
-        normalizedPathLength: normalizeRuntimePathForComparison(worktree.path).length
-      })
+      candidates.push({ worktree, path: worktree.path, source: 'current-path' })
     }
 
     for (const priorWorktreeId of worktree.priorWorktreeIds ?? []) {
@@ -85,12 +86,7 @@ function buildWorktreeCandidates(worktrees: readonly Worktree[]): WorktreeCandid
       if (!parsed || parsed.repoId !== worktree.repoId || !hasUsablePath(parsed.worktreePath)) {
         continue
       }
-      candidates.push({
-        worktree,
-        path: parsed.worktreePath,
-        source: 'prior-path',
-        normalizedPathLength: normalizeRuntimePathForComparison(parsed.worktreePath).length
-      })
+      candidates.push({ worktree, path: parsed.worktreePath, source: 'prior-path' })
     }
   }
   return candidates
@@ -111,7 +107,10 @@ function isTerminalCwdInsideWorktree(worktreePath: string, terminalCwd: string):
   return wslPath ? createNormalizedPathInsideOrEqualMatcher(wslPath.linuxPath)(terminalCwd) : false
 }
 
-function compareWorktreeCandidates(left: WorktreeCandidate, right: WorktreeCandidate): number {
+function compareWorktreeCandidates(
+  left: MatchedWorktreeCandidate,
+  right: MatchedWorktreeCandidate
+): number {
   const lengthDifference = right.normalizedPathLength - left.normalizedPathLength
   if (lengthDifference !== 0) {
     return lengthDifference
