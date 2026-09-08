@@ -430,6 +430,31 @@ describe('buildSearchableBrowserPages', () => {
     expect(results.map((result) => result.pageId)).toEqual(['page-1', 'page-4', 'page-2', 'page-3'])
     expect(results[0].isCurrentPage).toBe(true)
   })
+
+  // Why this matters to the workspace index: it keeps the first browser tab per workspace id, so
+  // it would lose a later owned tab if two ever reached the lookup. This pins that they cannot.
+  it('omits a workspace claimed by more than one unified browser tab', () => {
+    const entries = buildFixture({
+      unifiedTabsByWorktree: {
+        'wt-1': [
+          browserUnifiedTab('tab-foreign', 'ws-1', 'wt-2'),
+          browserUnifiedTab('tab-owned', 'ws-1', 'wt-1')
+        ]
+      }
+    })
+
+    expect(entries.some((entry) => entry.workspace.id === 'ws-1')).toBe(false)
+  })
+
+  // Why: a workspace whose only unified tab belongs to another worktree must stay hidden here.
+  it('omits a workspace whose single unified browser tab is not owned by this worktree', () => {
+    const entries = buildFixture({
+      unifiedTabsByWorktree: { 'wt-1': [browserUnifiedTab('tab-foreign', 'ws-1', 'wt-2')] }
+    })
+
+    expect(entries.some((entry) => entry.workspace.id === 'ws-1')).toBe(false)
+    expect(entries.some((entry) => entry.workspace.id === 'ws-2')).toBe(true)
+  })
 })
 
 function browserUnifiedTab(
