@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { homedir, platform } from 'node:os'
 import path from 'node:path'
+import { sortDirectoryEntriesByName } from './directory-entry-order'
 
 const WARP_CHANNELS = [
   { macName: '.warp', linuxName: 'warp-terminal', windowsName: 'Warp' },
@@ -16,11 +17,14 @@ const WARP_CHANNELS = [
   }
 ]
 
-function readDirectoryEntries(directoryPath: string): Dirent[] {
+function readDirectoryEntries(
+  directoryPath: string,
+  include: (entry: Dirent) => boolean
+): Dirent[] {
   try {
-    const entries = readdirSync(directoryPath, { withFileTypes: true })
-    const compareNames = new Intl.Collator(undefined, { sensitivity: 'base' }).compare
-    return entries.sort((left, right) => compareNames(left.name, right.name))
+    return sortDirectoryEntriesByName(
+      readdirSync(directoryPath, { withFileTypes: true }).filter(include)
+    )
   } catch {
     return []
   }
@@ -57,9 +61,10 @@ function getMacWarpThemeDirectories(home: string): string[] {
   return warpThemeDirectoriesFromDataHomes(
     [
       ...WARP_CHANNELS.map((channel) => pathImpl.join(home, channel.macName)),
-      ...readDirectoryEntries(home)
-        .filter((entry) => entry.isDirectory() && entry.name.startsWith('.warp'))
-        .map((entry) => pathImpl.join(home, entry.name))
+      ...readDirectoryEntries(
+        home,
+        (entry) => entry.isDirectory() && entry.name.startsWith('.warp')
+      ).map((entry) => pathImpl.join(home, entry.name))
     ],
     pathImpl
   )
@@ -77,13 +82,11 @@ function getLinuxWarpThemeDirectories(home: string): string[] {
   return warpThemeDirectoriesFromDataHomes(
     [
       ...WARP_CHANNELS.map((channel) => pathImpl.join(dataHome, channel.linuxName)),
-      ...readDirectoryEntries(dataHome)
-        .filter(
-          (entry) =>
-            entry.isDirectory() &&
-            (entry.name === 'warp-terminal' || entry.name.startsWith('warp-'))
-        )
-        .map((entry) => pathImpl.join(dataHome, entry.name))
+      ...readDirectoryEntries(
+        dataHome,
+        (entry) =>
+          entry.isDirectory() && (entry.name === 'warp-terminal' || entry.name.startsWith('warp-'))
+      ).map((entry) => pathImpl.join(dataHome, entry.name))
     ],
     pathImpl
   )
@@ -102,10 +105,7 @@ function getWindowsWarpThemeDirectories(home: string): string[] {
       path.win32
     )
   }
-  for (const entry of readDirectoryEntries(warpAppData)) {
-    if (!entry.isDirectory()) {
-      continue
-    }
+  for (const entry of readDirectoryEntries(warpAppData, (entry) => entry.isDirectory())) {
     addDedupeDirectory(
       directories,
       seenDirectories,
