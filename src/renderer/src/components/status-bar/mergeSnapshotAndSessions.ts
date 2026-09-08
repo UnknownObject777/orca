@@ -147,7 +147,7 @@ export function mergeSnapshotAndSessions(
   // Why: pre-build O(1) lookup indices once per merge. This includes live
   // ptyIdsByTabId plus deferred-reattach wake hints, so restored inactive
   // sessions do not appear as Resource Manager orphans before their pane mounts.
-  const index = buildResourceSessionBindingIndex(ctx, true)
+  const index = buildResourceSessionBindingIndex(ctx)
   const boundPtyIds = index.boundPtyIds
   // Why: the daemon list is the only place agent ownership is reported. Snapshot-derived rows
   // describe the same sessions by id, so carry it across rather than inventing an answer; a

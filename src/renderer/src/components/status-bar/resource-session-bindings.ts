@@ -35,27 +35,23 @@ function addBinding(
 }
 
 export function buildResourceSessionBindingIndex(
-  inputs: ResourceSessionBindingInputs,
-  includeTabLabels = false
+  inputs: ResourceSessionBindingInputs
 ): ResourceSessionBindingIndex {
   const ptyIdToTabId = new Map<string, string>()
   const tabIdToWorktreeId = new Map<string, string>()
   const tabsByIdByWorktree: ResourceSessionBindingIndex['tabsByIdByWorktree'] = new Map()
 
   for (const [worktreeId, tabs] of Object.entries(inputs.tabsByWorktree)) {
-    const byId = includeTabLabels
-      ? new Map<string, { tab: TerminalTab; index: number }>()
-      : undefined
+    const byId = new Map<string, { tab: TerminalTab; index: number }>()
     tabs.forEach((tab, index) => {
       const id = tab.id
       tabIdToWorktreeId.set(id, worktreeId)
-      if (byId && !byId.has(id)) {
+      // First tab wins, matching the findIndex scan this index replaces.
+      if (!byId.has(id)) {
         byId.set(id, { tab, index })
       }
     })
-    if (byId) {
-      tabsByIdByWorktree.set(worktreeId, byId)
-    }
+    tabsByIdByWorktree.set(worktreeId, byId)
   }
 
   for (const [tabId, ptyIds] of Object.entries(inputs.ptyIdsByTabId)) {
