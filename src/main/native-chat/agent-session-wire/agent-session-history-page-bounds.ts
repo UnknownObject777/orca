@@ -74,6 +74,9 @@ export function boundHistoryItemsByBytes(
   }
 }
 
+/** Adjacent same-sequence runs, walked from the end (`newest`) or the start (`oldest`)
+ *  so a caller that stops at its window never groups the history it will not return.
+ *  Groups and their items keep the order the eager forward grouping produced. */
 function* groupItemsBySequence(
   items: readonly AgentJournalRenderItem[],
   keep: 'newest' | 'oldest'
