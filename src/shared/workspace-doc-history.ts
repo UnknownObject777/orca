@@ -41,6 +41,9 @@ export function normalizeWorkspaceDocHistoryEntries(
     ) {
       continue
     }
+    // Nested, not a joined key: any separator would collide with worktree ids or paths that
+    // contain it. Must stay equivalent to `browserPageDocLocationsEqual`, which the store's
+    // doc-history dedupe still uses — divergence would show up as duplicate dropdown rows.
     const { worktreeId, filePath } = entry.docLocation
     const seenPaths = seenPathsByWorktree.get(worktreeId)
     if (seenPaths?.has(filePath)) {
