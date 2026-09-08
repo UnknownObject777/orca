@@ -134,6 +134,57 @@ describe('installSkillCloudGrant', () => {
   })
 })
 
+// The failure report is keyed by user-visible skill IDs, so switching the
+// membership test from `includes` to a Set must not change which entries appear,
+// how often, or in what order.
+it('reports selected manifest entries in manifest order, duplicates and all', async () => {
+  const skills = ['b', 'a', 'dupe', 'dupe', 'unselected'].map((id) => ({
+    id,
+    name: `name-${id}`,
+    digest: 'a'.repeat(64),
+    files: []
+  }))
+  const bundleGrant = {
+    ...grant,
+    version: { ...grant.version, manifest: { skills, bundleDigest: 'c'.repeat(64) } }
+  } as unknown as SkillCloudDownloadGrant
+  const runtime = {
+    installSharedSkillBundleRequest: vi
+      .fn()
+      .mockRejectedValue(new Error('skill-install-filesystem-failed'))
+  } as unknown as OrcaRuntimeService
+  const result = await installSkillBundleCloudGrant(runtime, bundleGrant, {
+    operationId: 'op',
+    // Repeated and unknown selections must be inert, exactly as with `includes`.
+    selectedSkillIds: ['dupe', 'a', 'a', 'b', 'never-in-manifest'],
+    destination: { scope: 'global' }
+  })
+  expect(result.status).toBe('ok')
+  if (result.status === 'ok') {
+    expect(result.value.skills.map((skill) => skill.skillId)).toEqual(['b', 'a', 'dupe', 'dupe'])
+  }
+})
+
+it('reports no skills when nothing was selected', async () => {
+  const skills = [{ id: 'a', name: 'a', digest: 'a'.repeat(64), files: [] }]
+  const bundleGrant = {
+    ...grant,
+    version: { ...grant.version, manifest: { skills, bundleDigest: 'c'.repeat(64) } }
+  } as unknown as SkillCloudDownloadGrant
+  const runtime = {
+    installSharedSkillBundleRequest: vi.fn().mockRejectedValue(new Error('skill-install-cancelled'))
+  } as unknown as OrcaRuntimeService
+  const result = await installSkillBundleCloudGrant(runtime, bundleGrant, {
+    operationId: 'op',
+    selectedSkillIds: [],
+    destination: { scope: 'global' }
+  })
+  expect(result.status).toBe('ok')
+  if (result.status === 'ok') {
+    expect(result.value.skills).toEqual([])
+  }
+})
+
 it.each(['skill-install-cancelled', 'skill-install-filesystem-failed'])(
   'indexes selected IDs when reporting %s',
   async (code) => {

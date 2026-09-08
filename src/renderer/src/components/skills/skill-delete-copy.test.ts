@@ -172,7 +172,12 @@ it('sorts deletion roots once with unchanged case, accent, and number ordering',
       ])
     )
     expect(summary).toContain(expected.join(', '))
-    expect(construct).toHaveBeenCalledExactlyOnceWith(undefined, { sensitivity: 'base' })
+    // The shared renderer collator is memoised process-wide, so it is built at
+    // most once here and never per comparison.
+    expect(construct.mock.calls.length).toBeLessThanOrEqual(1)
+    for (const call of construct.mock.calls) {
+      expect(call).toEqual([undefined, { sensitivity: 'base' }])
+    }
     expect(localeCompare).not.toHaveBeenCalled()
   } finally {
     vi.restoreAllMocks()
