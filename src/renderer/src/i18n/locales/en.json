@@ -5315,7 +5315,8 @@
           "fee535205b": "Tasks",
           "d599269755": "Hide from sidebar",
           "artifacts": "Artifacts",
-          "skills": "Skills"
+          "skills": "Skills",
+          "canvas": "Canvas"
         },
         "SidebarRepositoryFilterSection": {
           "d3a9c4cea1": "Clear",
@@ -16886,6 +16887,23 @@
       "HostedReviewUnlinkMenuItem": {
         "label": "Unlink {{value0}} from workspace",
         "description": "Orca will hide {{value0}} {{value1}} details for this workspace. The {{value0}} and branch on {{value2}} won’t be changed."
+      },
+      "canvas-page": {
+        "title": "Canvas",
+        "hint": "Drag .md or .html files here from the Explorer to pin them as cards.",
+        "emptyTitle": "This canvas is empty",
+        "emptyHint": "Drag Markdown or HTML files from the Explorer onto the canvas to preview them side by side.",
+        "noWorkspace": "Open a workspace to use the canvas.",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "resetZoom": "Reset zoom to 100%",
+        "resetView": "Reset view",
+        "openInTab": "Open in a tab",
+        "reloadCard": "Reload preview",
+        "removeCard": "Remove from canvas",
+        "readFailed": "Could not read this file.",
+        "previewUnavailable": "Preview unavailable",
+        "htmlPreviewAriaLabel": "HTML prototype preview"
       }
     },
     "i18n": {
