@@ -9,6 +9,7 @@ export type SshPtyBindingCleanupOperations = {
   scheduleSave: () => void
 }
 
+/** `binding.ptyId` must already be in lease-comparable (relay) form; callers normalize it. */
 function sshRemotePtyLeaseMayReferenceBinding(
   lease: SshRemotePtyLease,
   binding: {
@@ -48,21 +49,28 @@ export function clearSshRemotePtyBindingsForLeases(
   if (!leases?.length) {
     return false
   }
-  const leasesByPtyId = new Map<string, SshRemotePtyLease[]>()
-  for (const lease of leases) {
-    if (lease.targetId !== targetId) {
-      continue
-    }
-    const entries = leasesByPtyId.get(lease.ptyId)
-    if (entries) {
-      entries.push(lease)
-    } else {
-      leasesByPtyId.set(lease.ptyId, [lease])
-    }
-  }
+  // Keyed by the stored (relay) pty id, which is the only form a lease holds; every lookup below
+  // normalizes the binding id to that form first, so a bucket miss means "no lease names this pty"
+  // and the binding is KEPT. Failing closed here leaves a stale id to be retired on reattach,
+  // where clearing on a bad match would strand a live remote shell behind a respawned pane.
+  let leasesByPtyId: Map<string, SshRemotePtyLease[]> | undefined
   const referencesBinding = (
     binding: Parameters<typeof sshRemotePtyLeaseMayReferenceBinding>[1]
   ): boolean => {
+    if (!leasesByPtyId) {
+      leasesByPtyId = new Map()
+      for (const lease of leases) {
+        if (lease.targetId !== targetId) {
+          continue
+        }
+        const entries = leasesByPtyId.get(lease.ptyId)
+        if (entries) {
+          entries.push(lease)
+        } else {
+          leasesByPtyId.set(lease.ptyId, [lease])
+        }
+      }
+    }
     const ptyId = operations.toComparablePtyId(binding.targetId, binding.ptyId)
     return (leasesByPtyId.get(ptyId) ?? []).some((lease) =>
       sshRemotePtyLeaseMayReferenceBinding(lease, { ...binding, ptyId })
