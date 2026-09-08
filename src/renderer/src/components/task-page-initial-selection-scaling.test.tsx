@@ -59,4 +59,30 @@ describe('task page initial repo selection', () => {
     expect(resolveSelection(repos, [])).toEqual(['a', 'b'])
     expect(resolveSelection(repos, ['missing', 'b', 'b'])).toEqual(['b'])
   })
+
+  it('ignores persisted IDs for ineligible repos, including folder workspaces', () => {
+    const repos: Repo[] = [
+      {
+        id: 'tracked',
+        path: '/repos/tracked',
+        displayName: 'tracked',
+        badgeColor: '',
+        addedAt: 0,
+        kind: 'git'
+      },
+      {
+        id: 'folder',
+        path: '/repos/folder',
+        displayName: 'folder',
+        badgeColor: '',
+        addedAt: 1,
+        kind: 'folder'
+      }
+    ]
+
+    // A folder workspace is never task-eligible, so a stored selection naming only one must fall
+    // through to the automatic default rather than rendering an empty picker.
+    expect(resolveSelection(repos, ['folder'])).toEqual(['tracked'])
+    expect(resolveSelection(repos, ['folder', 'tracked'])).toEqual(['tracked'])
+  })
 })
