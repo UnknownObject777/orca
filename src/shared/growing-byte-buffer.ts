@@ -93,6 +93,7 @@ export class GrowingByteBuffer {
     return value
   }
 
+  // Returns a view over the released storage, not a copy; the buffer never writes to it again.
   takeBuffer(): Buffer {
     const value = this.storage.subarray(0, this.length)
     this.clear()

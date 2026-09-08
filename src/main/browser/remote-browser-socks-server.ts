@@ -1,7 +1,7 @@
-import { pipeUpstreamToClient } from './remote-browser-socks-upstream'
 import { createServer, type Server, type Socket } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { GrowingByteBuffer } from '../../shared/growing-byte-buffer'
+import { pipeUpstreamToClient } from './remote-browser-socks-upstream'
 
 const SOCKS_VERSION = 5
 const SOCKS_NO_AUTH = 0
