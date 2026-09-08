@@ -151,4 +151,32 @@ describe('closeBrowserTab with reason cleanup', () => {
 
     expect(recordFeatureInteraction).toHaveBeenCalledWith('terminal-tabs')
   })
+  it('clears focus for closed pages without rescanning pages for unrelated focus entries', () => {
+    const { store, workspaceId } = storeWithOnlyBrowserTab()
+    const original = store.getState().browserPagesByWorkspace[workspaceId][0]
+    let idReads = 0
+    const pages = Array.from({ length: 1000 }, (_, index) => ({
+      ...original,
+      get id() {
+        idReads++
+        return `closed-${index}`
+      }
+    }))
+    const unrelated = Object.fromEntries(
+      Array.from({ length: 1000 }, (_, i) => [`other-${i}`, true as const])
+    )
+    store.setState({
+      browserPagesByWorkspace: { [workspaceId]: pages },
+      pendingAddressBarFocusByPageId: { ...unrelated, 'closed-999': true, [workspaceId]: true },
+      pendingAddressBarFocusByTabId: { ...unrelated, 'closed-999': true, [workspaceId]: true }
+    })
+    idReads = 0
+    store.getState().closeBrowserTab(workspaceId, { reason: 'cleanup' })
+    expect(store.getState().pendingAddressBarFocusByPageId).toEqual({
+      ...unrelated,
+      [workspaceId]: true
+    })
+    expect(store.getState().pendingAddressBarFocusByTabId).toEqual(unrelated)
+    expect(idReads).toBeLessThan(10_000)
+  })
 })
