@@ -36,3 +36,37 @@ it('consumes monotonically scanned trust ranges without pairwise deduplication',
   expect(result.split(header)).toHaveLength(2)
   expect(result).toContain('trusted_hash = "updated"')
 })
+
+// Dropping the old dedup+sort is only sound because the scanner advances its
+// cursor past each block it emits. Pin that precondition: if a future scanner
+// change lets ranges repeat or overlap, the upsert below would delete or widen
+// a neighbouring trust block instead of rewriting just the matched one.
+it('emits trust ranges with strictly ascending, non-overlapping spans', async () => {
+  const { findHookTrustBlockRanges } = await vi.importActual<typeof HookTrustBlocks>(
+    './config-toml-hook-trust-blocks'
+  )
+  const key = '/foo/hooks.json:pre_tool_use:0:0'
+  const header = `[hooks.state."${key}"]`
+  const contents = [
+    '',
+    header,
+    `${header}\n${header}\n`,
+    `${header}\nenabled = true\n`.repeat(50),
+    `${header}\r\nenabled = true\r\n`.repeat(3),
+    `[x]\nv = """\n${header}\n"""\n${header}\nenabled = true\n`,
+    `[x]\na = [\n${header}\n]\n${header}\nenabled = true\n`,
+    `${header}\nenabled = true\n[[arr]]\nz = 1\n${header}\n`
+  ]
+  for (const content of contents) {
+    const ranges = findHookTrustBlockRanges(content, new Set([key]))
+    for (const [index, range] of ranges.entries()) {
+      expect(range.end).toBeGreaterThanOrEqual(range.start)
+      expect(range.end).toBeLessThanOrEqual(content.length)
+      if (index > 0) {
+        expect(ranges[index - 1].start).toBeLessThan(range.start)
+        expect(ranges[index - 1].end).toBeLessThanOrEqual(range.start)
+      }
+    }
+    expect(new Set(ranges.map((range) => `${range.start}:${range.end}`)).size).toBe(ranges.length)
+  }
+})
