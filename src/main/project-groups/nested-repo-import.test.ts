@@ -150,6 +150,30 @@ describe('createNestedProjectGroupResolver', () => {
     expect(resolver.getCreatedGroups()).toEqual([])
   })
 
+  it('leaves every separate-import repo ungrouped even when repo paths are supplied', () => {
+    const { groups, createGroup } = createGroupRecorder()
+    const repoPaths = [
+      '/workspace/services/api',
+      '/workspace/services/worker',
+      '/workspace/platform/packages/shared'
+    ]
+    const resolver = createNestedProjectGroupResolver({
+      parentPath: '/workspace',
+      groupName: 'workspace',
+      mode: 'separate',
+      repoPaths,
+      createGroup
+    })
+
+    expect(repoPaths.map((repoPath) => resolver.getGroupForRepo(repoPath))).toEqual([
+      undefined,
+      undefined,
+      undefined
+    ])
+    expect(resolver.getRootGroup()).toBeUndefined()
+    expect(groups).toEqual([])
+  })
+
   it('preserves filesystem root parent paths when creating the root group', () => {
     const groups: ProjectGroup[] = []
     const resolver = createNestedProjectGroupResolver({
