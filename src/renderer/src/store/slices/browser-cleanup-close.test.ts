@@ -55,6 +55,24 @@ function storeWithOnlyBrowserTab(): {
   return { store, workspaceId: workspace.id, pageId }
 }
 
+/** Three browser tabs in a known tab-bar order, so neighbor selection is deterministic. */
+function storeWithThreeBrowserTabs(): {
+  store: ReturnType<typeof createTestStore>
+  ids: string[]
+} {
+  const store = createTestStore()
+  seedStore(store, {
+    worktreesByRepo: { repo1: [makeWorktree({ id: WT, repoId: 'repo1', path: '/path/wt1' })] },
+    activeWorktreeId: WT,
+    activeTabType: 'terminal'
+  })
+  const ids = [0, 1, 2].map(
+    (index) =>
+      store.getState().createBrowserTab(WT, `https://example.test/${index}`, { activate: true }).id
+  )
+  return { store, ids }
+}
+
 describe('closeBrowserTab with reason cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -178,5 +196,31 @@ describe('closeBrowserTab with reason cleanup', () => {
     })
     expect(store.getState().pendingAddressBarFocusByTabId).toEqual(unrelated)
     expect(idReads).toBeLessThan(10_000)
+  })
+
+  // Why: the omit path must not hand every pending-focus selector a fresh record on each close.
+  it('keeps the pending focus records identical when the closed tab had no pending entry', () => {
+    const { store, workspaceId } = storeWithOnlyBrowserTab()
+    const pending = { 'other-tab': true as const }
+    store.setState({
+      pendingAddressBarFocusByPageId: pending,
+      pendingAddressBarFocusByTabId: pending
+    })
+
+    store.getState().closeBrowserTab(workspaceId, { reason: 'cleanup' })
+
+    expect(store.getState().pendingAddressBarFocusByPageId).toBe(pending)
+    expect(store.getState().pendingAddressBarFocusByTabId).toBe(pending)
+  })
+
+  // Why: closing a tab the user is not looking at must never move focus, whatever the
+  // pending-address-bar bookkeeping does around it.
+  it('leaves the active browser tab alone when a background tab closes', () => {
+    const { store, ids } = storeWithThreeBrowserTabs()
+    store.getState().setActiveBrowserTab(ids[0]!)
+
+    store.getState().closeBrowserTab(ids[2]!)
+
+    expect(store.getState().activeBrowserTabIdByWorktree[WT]).toBe(ids[0]!)
   })
 })
