@@ -8,6 +8,12 @@ import { githubRepoIdentityKey, isDefaultGitHubHost } from './github/repository-
 import type { Project, ProjectHostSetup, ProjectProviderIdentity } from './project-types'
 import type { Repo } from './repo-types'
 
+/**
+ * A projection-local draft. `project` is always freshly built by `createProjectFromRepo`, never a
+ * caller's or persisted row, because `mergeProjectRepo` writes to it in place; seeding it from an
+ * existing `Project` would leak those writes to whoever else holds that row. `sourceRepoIds`
+ * mirrors `project.sourceRepoIds` so membership is a lookup rather than a rescan.
+ */
 type ProjectAccumulator = {
   project: Project
   sourceRepoIds: Set<string>
@@ -263,6 +269,7 @@ function createProjectFromRepo(repo: Repo): Project {
   }
 }
 
+/** Mutates the draft in place — only ever call this on an accumulator this projection owns. */
 function mergeProjectRepo(accumulator: ProjectAccumulator, repo: Repo): void {
   const { project, sourceRepoIds } = accumulator
   if (!sourceRepoIds.has(repo.id)) {
