@@ -169,6 +169,16 @@ describe('convergableSkillNames', () => {
     )
     expect([...result]).toEqual(['orca-cli'])
   })
+  // A skill directory can legitimately be named `constructor`, and lock names come
+  // straight off disk, so the snapshot lookup must not walk Object.prototype.
+  it('keeps a skill named after an Object prototype key eligible instead of throwing', () => {
+    for (const name of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+      expect([
+        ...convergableSkillNames([placement(name, 1)], new Map([[name, '091d9bcc']]), {})
+      ]).toEqual([name])
+    }
+  })
+
   it('indexes placements once across many independent locked skills', () => {
     let nameReads = 0
     const installations = Array.from({ length: 1000 }, (_, index) => ({

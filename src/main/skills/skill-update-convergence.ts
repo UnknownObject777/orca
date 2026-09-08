@@ -58,7 +58,9 @@ export function convergableSkillNames(
     if (observable.length === 0) {
       continue
     }
-    const revisions = knownSnapshots[name] ?? []
+    // `Object.hasOwn`: names come from an on-disk lock file, so a skill called
+    // `constructor` would otherwise read a function off the prototype and throw.
+    const revisions = (Object.hasOwn(knownSnapshots, name) && knownSnapshots[name]) || []
     // Why: the revision each placement resolved to during observation, not a fresh
     // lookup by whole-folder digest. Identity tolerates files the manifest never
     // listed, so a folder holding an agent CLI's sidecar digests to nothing any
