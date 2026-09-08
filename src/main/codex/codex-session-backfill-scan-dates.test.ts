@@ -9,6 +9,7 @@ import {
   parseCodexSessionBackfillDates,
   subtractCodexSessionBackfillDates
 } from './codex-session-backfill-scan-dates'
+import type { CodexSessionBackfillDate } from './codex-session-backfill-types'
 
 describe('codex session backfill scan dates', () => {
   it('reads UTC parts so a local evening never lands on the wrong directory', () => {
@@ -129,5 +130,35 @@ describe('bounded backfill range construction', () => {
     expect(
       expandCodexSessionBackfillDatesThroughToday([['2024', '03', '01']], ['2024', '02', '28'], 3)
     ).toEqual(expandCodexSessionBackfillDatesThroughToday(dates, ['2024', '03', '01'], 3))
+  })
+
+  // The arithmetic cardinality gate must admit and reject exactly what enumerating the range
+  // would, on every calendar edge that has ever broken a day count: leap days, century rules,
+  // year rollover, and the DST switches the UTC-only arithmetic has to stay indifferent to.
+  it.each([
+    ['leap February', ['2024', '02', '27'], ['2024', '03', '02']],
+    ['non-leap February', ['2023', '02', '27'], ['2023', '03', '02']],
+    ['US spring-forward', ['2024', '03', '09'], ['2024', '03', '11']],
+    ['US fall-back', ['2024', '11', '02'], ['2024', '11', '04']],
+    ['EU spring-forward', ['2025', '03', '29'], ['2025', '03', '31']],
+    ['southern-hemisphere DST', ['2025', '04', '05'], ['2025', '04', '07']],
+    ['year rollover', ['2024', '12', '30'], ['2025', '01', '02']],
+    ['leap century', ['1999', '12', '31'], ['2000', '01', '02']],
+    ['non-leap century', ['2100', '02', '27'], ['2100', '03', '02']],
+    ['30-day month end', ['2026', '04', '29'], ['2026', '05', '02']],
+    ['single day', ['2026', '09', '07'], ['2026', '09', '07']]
+  ])('matches the enumerated range at the %s cap boundary', (_label, from, to) => {
+    const start = new Date(Date.UTC(Number(from[0]), Number(from[1]) - 1, Number(from[2])))
+    const end = new Date(Date.UTC(Number(to[0]), Number(to[1]) - 1, Number(to[2])))
+    const enumerated = getCodexSessionBackfillDatesBetween(start, end)
+    const pending = [from] as CodexSessionBackfillDate[]
+    const today = to as CodexSessionBackfillDate
+
+    expect(expandCodexSessionBackfillDatesThroughToday(pending, today, enumerated.length)).toEqual(
+      enumerated
+    )
+    expect(
+      expandCodexSessionBackfillDatesThroughToday(pending, today, enumerated.length - 1)
+    ).toBeNull()
   })
 })
