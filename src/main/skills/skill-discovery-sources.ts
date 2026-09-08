@@ -60,6 +60,14 @@ export function sortDiscoveredSkills(skills: DiscoveredSkill[]): DiscoveredSkill
   )
 }
 
+export function sortSkillDiscoverySources(sources: SkillDiscoverySource[]): SkillDiscoverySource[] {
+  if (sources.length < 2) {
+    return sources
+  }
+  const compare = new Intl.Collator(undefined, { sensitivity: 'base' }).compare
+  return sources.sort((a, b) => compare(a.label, b.label))
+}
+
 function source(
   id: string,
   label: string,

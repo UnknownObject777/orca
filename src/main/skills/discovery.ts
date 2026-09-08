@@ -11,6 +11,7 @@ import type {
 import {
   buildSkillDiscoverySources,
   sortDiscoveredSkills,
+  sortSkillDiscoverySources,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
@@ -307,10 +308,9 @@ export async function discoverSkills(args: {
       `[skills] scan roots=${roots.length} present=${present} walked=${walked.length} skills=${skills.length} ms=${Date.now() - startedAt} ids=${walked.slice(0, MAX_LOGGED_ROOT_IDS).join(',')}`
     )
   }
-  const compareSourceLabels = new Intl.Collator(undefined, { sensitivity: 'base' }).compare
   return {
     skills,
-    sources: sources.sort((a, b) => compareSourceLabels(a.label, b.label)),
+    sources: sortSkillDiscoverySources(sources),
     scannedAt: Date.now()
   }
 }

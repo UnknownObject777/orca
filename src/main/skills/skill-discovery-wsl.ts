@@ -10,6 +10,7 @@ import { runWslProcess } from '../wsl/wsl-runner'
 import {
   buildSkillDiscoverySources,
   sortDiscoveredSkills,
+  sortSkillDiscoverySources,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
@@ -161,10 +162,9 @@ export function parseWslSkillDiscoveryOutput(
       skippedReason: exists ? undefined : 'missing'
     }
   })
-  const compareSourceLabels = new Intl.Collator(undefined, { sensitivity: 'base' }).compare
   return {
     skills: sortDiscoveredSkills([...skillsByCanonicalPath.values()]),
-    sources: sources.sort((a, b) => compareSourceLabels(a.label, b.label)),
+    sources: sortSkillDiscoverySources(sources),
     scannedAt
   }
 }
