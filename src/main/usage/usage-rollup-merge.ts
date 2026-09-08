@@ -1,9 +1,9 @@
+/** Combines rollups produced by separate sources (rollout files, sibling databases) of one provider. */
 import {
   indexUsageSessionBreakdowns,
   usageLocationModelKey,
   type UsageSessionBreakdownIndex
 } from './usage-session-breakdown-index'
-/** Combines rollups produced by separate sources (rollout files, sibling databases) of one provider. */
 import {
   usageDailyAggregateKey,
   type UsageDailyAggregate,

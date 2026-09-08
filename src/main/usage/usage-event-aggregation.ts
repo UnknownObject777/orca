@@ -1,12 +1,12 @@
+/**
+ * Folds attributed usage events into per-session and per-day rollups. Shared by every
+ * event-based usage provider so a token-accounting fix lands in all of them at once.
+ */
 import {
   indexUsageSessionBreakdowns,
   usageLocationModelKey,
   type UsageSessionBreakdownIndex
 } from './usage-session-breakdown-index'
-/**
- * Folds attributed usage events into per-session and per-day rollups. Shared by every
- * event-based usage provider so a token-accounting fix lands in all of them at once.
- */
 import { mergeUsageDailyAggregates, mergeUsageSessions } from './usage-rollup-merge'
 import {
   usageDailyAggregateKey,
