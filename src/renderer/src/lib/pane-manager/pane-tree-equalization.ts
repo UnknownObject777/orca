@@ -20,6 +20,9 @@ function getEqualizeWeight(
     return 1
   }
 
+  // Keyed by element alone: `direction` is always the parent split's axis, which the
+  // tree position fixes, so one element is never asked for two different weights.
+  // The map lives for one sweep, so a split/close/resize can never read a stale weight.
   const cached = weights.get(el)
   if (cached !== undefined) {
     return cached
