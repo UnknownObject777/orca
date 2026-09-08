@@ -29,6 +29,10 @@ export function selectHostBalancedPage<TRow>(
   })
   const buckets = [...indicesByHost.values()]
   const chosen: number[] = []
+  // Compacting in place keeps `buckets[0..activeCount)` as exactly the buckets longer than
+  // `round`, in their original order, so `bucket[round]` is always defined and the round robin
+  // still visits hosts in first-appearance order. Retiring them keeps a long host bucket from
+  // re-scanning every exhausted one. Writes land at or before the slot just read, never ahead.
   let activeCount = buckets.length
   let round = 0
   while (chosen.length < limit && activeCount > 0) {
