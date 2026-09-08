@@ -66,4 +66,20 @@ describe('tool pair limits', () => {
       original([call, call, result, result], 1)
     )
   })
+  it('still answers every retained call when the results trail far behind', () => {
+    // The break must not fire while a retained call is unanswered, or the mobile run
+    // would render a spinner for a tool that actually completed.
+    const blocks = [call, call, ...Array.from({ length: 5000 }, () => result)]
+    expect(pairToolBlocks(blocks, 2)).toEqual([
+      { call, result },
+      { call, result }
+    ])
+    expect(pairToolBlocks(blocks, 2)).toEqual(original(blocks, 2))
+  })
+
+  it('keeps a leading stray result and then stops at the limit', () => {
+    const blocks = [result, call, result, call, result]
+    expect(pairToolBlocks(blocks, 1)).toEqual(original(blocks, 1))
+    expect(pairToolBlocks(blocks, 1)).toEqual([{ result }])
+  })
 })
