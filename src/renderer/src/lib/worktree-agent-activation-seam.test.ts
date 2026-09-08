@@ -301,4 +301,46 @@ describe('worktree agent activation seam', () => {
       params: { sessionId: 'chat-1' }
     })
   })
+
+  // A peer owns its own PTYs, so this client can never scope an inventory at it. Scoping must not
+  // turn that into a refusal: 'blocked' would also skip the sleeping-agent resume below.
+  it('still reaches a verdict for a paired-runtime-owned workspace', async () => {
+    const worktree = makeWorktree()
+    useAppStore.setState({
+      ...baseState(),
+      worktreesByRepo: { [worktree.repoId]: [{ ...worktree, hostId: 'runtime:env-1' }] }
+    })
+    const { listSessions } = stubInventory()
+
+    expect(activateAndRevealWorktree(worktree.id)).toEqual({ primaryTabId: null })
+    await expect(waitForWorktreeAgentActivationGateForTests(worktree.id)).resolves.toBe('empty')
+    expect(listSessions).toHaveBeenCalledExactlyOnceWith()
+  })
+
+  // Loss of contact with the relay is not evidence about the host, and once the sync has stopped
+  // without an answer the bounded floor in workspace-terminal-host-authority.ts hands seeding back
+  // to this client — a detached provider must not turn that into a permanently empty workspace.
+  it('still seeds a pane when the selected SSH relay is detached', async () => {
+    const worktree = makeWorktree()
+    useAppStore.setState({
+      ...baseState(),
+      worktreesByRepo: { [worktree.repoId]: [{ ...worktree, hostId: 'ssh:box' }] },
+      remoteWorkspaceSyncStatusByTargetId: { box: { phase: 'offline' } as never }
+    })
+    const { listSessions } = stubInventory()
+    listSessions.mockImplementation(async (scope?: unknown) => {
+      if (scope) {
+        throw new Error('No PTY provider for connection "box": the SSH relay is not attached')
+      }
+      return []
+    })
+
+    expect(activateAndRevealWorktree(worktree.id)).toEqual({ primaryTabId: null })
+    await expect(waitForWorktreeAgentActivationGateForTests(worktree.id)).resolves.toBe('empty')
+    expect(listSessions.mock.calls).toEqual([[{ connectionId: 'box' }], []])
+    await vi.waitFor(() =>
+      expect(useAppStore.getState().tabsByWorktree[worktree.id] ?? []).toHaveLength(1)
+    )
+    expect(useAppStore.getState().tabsByWorktree[worktree.id]?.[0]?.ptyId).toBeNull()
+  })
 })

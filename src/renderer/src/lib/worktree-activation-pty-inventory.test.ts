@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { folderWorkspaceKey } from '../../../shared/workspace-scope'
-import { resolveActivationPtyListScope } from './worktree-activation-pty-inventory'
+import {
+  listActivationPtySessions,
+  resolveActivationPtyListScope
+} from './worktree-activation-pty-inventory'
 
 const worktreeId = 'repo::/workspace'
+
+afterEach(() => vi.unstubAllGlobals())
+
+function stubListSessions(impl: (scope?: unknown) => Promise<unknown[]>) {
+  const listSessions = vi.fn(impl)
+  vi.stubGlobal('window', { api: { pty: { listSessions } } })
+  return listSessions
+}
 
 describe('activation inventory execution scope', () => {
   it('keeps a known local repo usable before unrelated runtime catalogs hydrate', () => {
@@ -21,7 +32,7 @@ describe('activation inventory execution scope', () => {
   })
 
   it('does not use the native repo fallback for an explicitly owned worktree', () => {
-    expect(() =>
+    expect(
       resolveActivationPtyListScope(
         {
           repos: [{ id: 'repo' }],
@@ -29,7 +40,7 @@ describe('activation inventory execution scope', () => {
         },
         worktreeId
       )
-    ).toThrow('provider unavailable')
+    ).toBeUndefined()
   })
 
   it.each(['local', 'ssh:remote%20box'] as const)('resolves only %s', (hostId) => {
@@ -55,8 +66,8 @@ describe('activation inventory execution scope', () => {
   })
 
   it('does not choose a provider for missing or ambiguous ownership', () => {
-    expect(() => resolveActivationPtyListScope({}, worktreeId)).toThrow('provider unavailable')
-    expect(() =>
+    expect(resolveActivationPtyListScope({}, worktreeId)).toBeUndefined()
+    expect(
       resolveActivationPtyListScope(
         {
           repos: [
@@ -66,12 +77,12 @@ describe('activation inventory execution scope', () => {
         },
         worktreeId
       )
-    ).toThrow('provider unavailable')
+    ).toBeUndefined()
   })
 
   it('never routes a paired host or its nested SSH target through client providers', () => {
     for (const hostId of ['runtime:hub', 'ssh:nested'] as const) {
-      expect(() =>
+      expect(
         resolveActivationPtyListScope(
           {
             worktreesByRepo: {
@@ -80,7 +91,64 @@ describe('activation inventory execution scope', () => {
           },
           worktreeId
         )
-      ).toThrow('provider unavailable')
+      ).toBeUndefined()
     }
+  })
+})
+
+describe('activation inventory census', () => {
+  it('asks only the owning provider when the client can name one', async () => {
+    const listSessions = stubListSessions(async () => [{ id: 'ssh:box@@pty-1' }])
+    await expect(
+      listActivationPtySessions({ repos: [{ id: 'repo', executionHostId: 'ssh:box' }] }, worktreeId)
+    ).resolves.toEqual([{ id: 'ssh:box@@pty-1' }])
+    expect(listSessions).toHaveBeenCalledExactlyOnceWith({ connectionId: 'box' })
+  })
+
+  // A paired peer's PTYs never enter this client's registry, so refusing to answer would strand the
+  // workspace with no surface at all; the unscoped inventory is the shipped answer for it.
+  it('falls back to the unscoped inventory for a workspace it cannot scope', async () => {
+    const listSessions = stubListSessions(async () => [])
+    await expect(
+      listActivationPtySessions(
+        {
+          worktreesByRepo: {
+            repo: [
+              {
+                id: worktreeId,
+                repoId: 'repo',
+                hostId: 'runtime:hub',
+                runtimeOwnerEnvironmentId: 'hub'
+              }
+            ]
+          }
+        },
+        worktreeId
+      )
+    ).resolves.toEqual([])
+    expect(listSessions).toHaveBeenCalledExactlyOnceWith()
+  })
+
+  it('retries unscoped when the selected relay is detached, and only then', async () => {
+    const detached = stubListSessions(async (scope) => {
+      if (scope) {
+        throw new Error(
+          'Error invoking remote method: Error: No PTY provider for connection "box": the SSH relay for this host is not attached'
+        )
+      }
+      return [{ id: 'local-1' }]
+    })
+    await expect(
+      listActivationPtySessions({ repos: [{ id: 'repo', executionHostId: 'ssh:box' }] }, worktreeId)
+    ).resolves.toEqual([{ id: 'local-1' }])
+    expect(detached.mock.calls).toEqual([[{ connectionId: 'box' }], []])
+
+    const refused = stubListSessions(async () => {
+      throw new Error('relay unavailable')
+    })
+    await expect(
+      listActivationPtySessions({ repos: [{ id: 'repo', executionHostId: 'ssh:box' }] }, worktreeId)
+    ).rejects.toThrow('relay unavailable')
+    expect(refused).toHaveBeenCalledOnce()
   })
 })
