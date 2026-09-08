@@ -27,7 +27,10 @@ function pickNextActiveTab(
     }
   })
   const closingIndex = group.tabOrder.findIndex((id) => closingIds.has(id))
-  return remaining.find((id) => firstIndices.get(id)! > closingIndex) ?? remaining.at(-1) ?? null
+  // -1 matches the pre-index `indexOf` miss, so an id outside `group.tabOrder` never wins.
+  return (
+    remaining.find((id) => (firstIndices.get(id) ?? -1) > closingIndex) ?? remaining.at(-1) ?? null
+  )
 }
 
 function pruneGroupLayout(
