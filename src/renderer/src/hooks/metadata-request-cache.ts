@@ -56,6 +56,10 @@ function pruneMetadataCache<T>(
   for (const [key] of sorted.slice(maxEntries)) {
     store.cache.delete(key)
   }
+  // Why: capacity eviction drops the oldest entries, so the gate computed above
+  // points at an expiry that no longer exists and would force a needless sweep.
+  const oldestSurvivor = sorted[maxEntries - 1]?.[1]
+  store.nextCacheExpiryAt = oldestSurvivor ? oldestSurvivor.fetchedAt + METADATA_TTL : Infinity
 }
 
 export function getFreshMetadata<T>(
