@@ -41,15 +41,14 @@ export async function consumeCompleteJsonlLines(args: {
     let lineStart = 0
     let newlineIndex = data.indexOf(NEWLINE_BYTE, lineStart)
     while (newlineIndex !== -1) {
-      const line =
-        remainderLength > 0
-          ? Buffer.concat(
-              [...remainderParts, data.subarray(lineStart, newlineIndex)],
-              remainderLength + newlineIndex - lineStart
-            )
-          : data.subarray(lineStart, newlineIndex)
-      remainderParts = []
-      remainderLength = 0
+      let line = data.subarray(lineStart, newlineIndex)
+      // Only the first line of a chunk can carry a prefix; resetting inside the
+      // branch keeps the common per-line path allocation-free.
+      if (remainderLength > 0) {
+        line = Buffer.concat([...remainderParts, line], remainderLength + line.length)
+        remainderParts = []
+        remainderLength = 0
+      }
       const lineEnd = line.at(-1) === CARRIAGE_RETURN_BYTE ? line.length - 1 : line.length
       if (args.onLineBytes) {
         args.onLineBytes(line.subarray(0, lineEnd))
