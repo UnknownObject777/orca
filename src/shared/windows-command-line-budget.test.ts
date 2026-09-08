@@ -50,6 +50,23 @@ describe('windows command line budget', () => {
     }
   })
 
+  // Why: the estimator seeks escapes until they look dense, then hands the rest to a
+  // plain scan. Both sides of that switch, and the handover index, must agree.
+  it('counts the same on either side of the dense-escape switch', () => {
+    for (const args of [
+      [`\\"${'x'.repeat(30000)}`],
+      [`${'x'.repeat(30000)}\\"`],
+      [`${'x'.repeat(5000)}${'"\\abc'.repeat(5000)}`],
+      ['"'.repeat(30000)],
+      ['\\'.repeat(30000)],
+      ['ab"cd\\ef'.repeat(4000)],
+      [`${'x'.repeat(255)}"${'x'.repeat(30000)}`],
+      [`${'"x'.repeat(200)}${'y'.repeat(30000)}`]
+    ]) {
+      expect(commandLineLength(args)).toBe(referenceCommandLineLength(args))
+    }
+  })
+
   it('matches the regex oracle across randomized quote-heavy command lines', () => {
     const pieces = [
       '"',
