@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import type { CanvasCard } from '@/store/slices/canvas'
 import { attachDocPreviewWebview } from '@/components/browser-pane/workspace-doc/doc-preview-webview-attach'
@@ -27,9 +27,30 @@ export function CanvasHtmlCard({
 }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const reloadRef = useRef<(() => void) | null>(null)
+  const fallbackRef = useRef(false)
   const [state, setState] = useState<PreviewState>('loading')
   const [fallbackHtml, setFallbackHtml] = useState<string | null>(null)
   const previewId = `canvas:${card.id}`
+
+  const readFileIntoFallback = useCallback(
+    (isDisposed: () => boolean): void => {
+      window.api.fs
+        .readFile({ filePath: card.filePath })
+        .then((result) => {
+          if (isDisposed()) {
+            return
+          }
+          setFallbackHtml(result.content)
+          setState('ready')
+        })
+        .catch(() => {
+          if (!isDisposed()) {
+            setState('unavailable')
+          }
+        })
+    },
+    [card.filePath]
+  )
 
   useEffect(() => {
     let disposed = false
@@ -41,23 +62,11 @@ export function CanvasHtmlCard({
       card.worktreeId,
       card.filePath
     )
+    fallbackRef.current = !request
     if (!request) {
       // Why: grants need an execution owner (runtime or SSH). A local file with neither still
       // previews as a self-contained document via iframe srcdoc.
-      window.api.fs
-        .readFile({ filePath: card.filePath })
-        .then((result) => {
-          if (disposed) {
-            return
-          }
-          setFallbackHtml(result.content)
-          setState('ready')
-        })
-        .catch(() => {
-          if (!disposed) {
-            setState('unavailable')
-          }
-        })
+      readFileIntoFallback(() => disposed)
       return () => {
         disposed = true
       }
@@ -100,26 +109,27 @@ export function CanvasHtmlCard({
       // The card owns the grant for its whole lifetime; detach without release would leak it.
       releaseDocPreviewGrant(previewId)
     }
-  }, [card.worktreeId, card.filePath, previewId])
+  }, [card.worktreeId, card.filePath, previewId, readFileIntoFallback])
 
   useEffect(() => {
+    let dispose: (() => void) | undefined
     if (reloadSignal > 0) {
-      if (fallbackHtml !== null) {
-        // Why: srcdoc has no reload; re-running the mount effect re-reads the file.
+      if (fallbackRef.current) {
+        // Why: srcdoc has no reload; re-read the file instead. Track the fallback path in a ref —
+        // depending on fallbackHtml here re-fires this effect on every set and loops the re-read.
+        let disposed = false
         setFallbackHtml(null)
         setState('loading')
-        window.api.fs
-          .readFile({ filePath: card.filePath })
-          .then((result) => {
-            setFallbackHtml(result.content)
-            setState('ready')
-          })
-          .catch(() => setState('unavailable'))
-        return
+        readFileIntoFallback(() => disposed)
+        dispose = () => {
+          disposed = true
+        }
+      } else {
+        reloadRef.current?.()
       }
-      reloadRef.current?.()
     }
-  }, [reloadSignal, fallbackHtml, card.filePath])
+    return dispose
+  }, [reloadSignal, card.filePath, readFileIntoFallback])
 
   return (
     <div className="relative h-full overflow-hidden bg-editor-surface">
