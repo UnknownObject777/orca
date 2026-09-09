@@ -1,8 +1,8 @@
 import { installRuntimeLinearCommandSurface } from './runtime-linear-command-surface'
-import { OrcaRuntimeWithResolveWaiter } from './orca-runtime-resolve-waiter'
+import { OrcaRuntimeWithOrmReview } from './orca-runtime-orm-review'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 
-class OrcaRuntimeService extends OrcaRuntimeWithResolveWaiter {}
+class OrcaRuntimeService extends OrcaRuntimeWithOrmReview {}
 type OrcaRuntimeServiceExport = RuntimeCommandSurfaceHost<OrcaRuntimeService>
 const OrcaRuntimeServiceExport = OrcaRuntimeService as unknown as {
   new (...args: ConstructorParameters<typeof OrcaRuntimeService>): OrcaRuntimeServiceExport
