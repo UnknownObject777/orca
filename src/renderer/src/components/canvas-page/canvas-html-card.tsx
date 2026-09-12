@@ -28,23 +28,27 @@ export function CanvasHtmlCard({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const reloadRef = useRef<(() => void) | null>(null)
   const fallbackRef = useRef(false)
+  const fallbackReadVersionRef = useRef(0)
   const [state, setState] = useState<PreviewState>('loading')
   const [fallbackHtml, setFallbackHtml] = useState<string | null>(null)
   const previewId = `canvas:${card.id}`
 
   const readFileIntoFallback = useCallback(
     (isDisposed: () => boolean): void => {
+      // Why: a reload can start while an earlier read is still in flight; only the latest
+      // read may settle into state, otherwise stale content or an old failure wins.
+      const readVersion = ++fallbackReadVersionRef.current
       window.api.fs
         .readFile({ filePath: card.filePath })
         .then((result) => {
-          if (isDisposed()) {
+          if (isDisposed() || readVersion !== fallbackReadVersionRef.current) {
             return
           }
           setFallbackHtml(result.content)
           setState('ready')
         })
         .catch(() => {
-          if (!isDisposed()) {
+          if (!isDisposed() && readVersion === fallbackReadVersionRef.current) {
             setState('unavailable')
           }
         })
@@ -111,6 +115,17 @@ export function CanvasHtmlCard({
     }
   }, [card.worktreeId, card.filePath, previewId, readFileIntoFallback])
 
+  const [handledReloadSignal, setHandledReloadSignal] = useState(reloadSignal)
+  if (reloadSignal !== handledReloadSignal) {
+    // Why: reset preview state during render (not in the effect below) so the spinner
+    // replaces stale content in the same commit the reload click lands in.
+    setHandledReloadSignal(reloadSignal)
+    if (reloadSignal > 0 && fallbackRef.current) {
+      setFallbackHtml(null)
+      setState('loading')
+    }
+  }
+
   useEffect(() => {
     let dispose: (() => void) | undefined
     if (reloadSignal > 0) {
@@ -118,8 +133,6 @@ export function CanvasHtmlCard({
         // Why: srcdoc has no reload; re-read the file instead. Track the fallback path in a ref —
         // depending on fallbackHtml here re-fires this effect on every set and loops the re-read.
         let disposed = false
-        setFallbackHtml(null)
-        setState('loading')
         readFileIntoFallback(() => disposed)
         dispose = () => {
           disposed = true
